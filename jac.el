@@ -20,7 +20,21 @@
 
 ;;; Commentary:
 
-;;
+;;;; Installation
+
+;; Put this file into `load-path'.  Maybe, byte-compile.
+;; Add the following line to your init file:
+;; (autoload 'jac "jac")
+;; Restart Emacs or re-evaluate the init file.
+
+;;;; Usage
+
+;; Call the command `jac' for cloning the current buffer.
+
+;; Both buffers have the same text contents.  If you edit in the
+;; original buffer the modifications are transferred to the clone and
+;; visa-versa.  Text properties are not transferred.  That means you
+;; can switch the major mode for the clone.
 
 ;;; Code:
 
