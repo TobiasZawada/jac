@@ -61,7 +61,8 @@ Point's position is corrected with LEN."
 
 ;;;###autoload
 (defun jac (&optional newname display-flag)
-  "Clone current buffer and give it CLONE-NAME."
+  "Clone current buffer and give it NEWNAME.
+DISPLAY-FLAG works like for `clone-buffer'."
   (interactive (progn
 		 (if (get major-mode 'no-clone)
 		     (error "Cannot clone a buffer in %s mode" mode-name))
