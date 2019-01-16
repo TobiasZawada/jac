@@ -31,7 +31,7 @@
 
 ;; Call the command `jac' for cloning the current buffer.
 
-;; Both buffers have the same text contents.  If you edit in the
+;; Both buffers have the same text contents.  If you edit the text in the
 ;; original buffer the modifications are transferred to the clone and
 ;; visa-versa.  Text properties are not transferred.  That means you
 ;; can switch the major mode for the clone.
