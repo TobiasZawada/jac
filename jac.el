@@ -59,7 +59,7 @@ Point's position is corrected with LEN."
 	       (setq clones (cl-remove buf clones))))
     (setq jac-clones clones)))
 
-(defun jac-buffer (&optional newname display-flag)
+(defun jac (&optional newname display-flag)
   "Clone current buffer and give it CLONE-NAME."
   (interactive (progn
 		 (if (get major-mode 'no-clone)
