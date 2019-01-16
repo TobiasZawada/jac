@@ -8,4 +8,4 @@ Put `jac.el` somewhere in your `load-path`. Maybe compile it.
 
 # Usage
 
-Call the command `jac-buffer` for cloning the current buffer.
+Call the command `jac` for cloning the current buffer.
