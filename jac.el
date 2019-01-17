@@ -59,7 +59,7 @@ This expands to:
 	     (if (buffer-live-p buf)
 		 (jac-with-current-wide-buffer buf
 		   (let ((inhibit-modification-hooks t))
-		     (delete-region b e)))
+		     (delete-region b (min e (point-max)))))
 	       (setq clones (cl-remove buf clones))))
     (setq jac-clones clones)))
 
@@ -104,19 +104,38 @@ DISPLAY-FLAG works like for `clone-buffer'."
 	(setq jac-clones (cons old jac-clones))
 	(setq buffer-file-name file))))))
 
-(defun jac-set-buffer-modified-p (&rest flag)
+(defvar jac-inhibit-set-clones-modified-p nil
+  "Master for current buffer modifying operation.")
+
+(defun jac-set-clones-modified-p (&rest flag)
   "Set the modified flag of the clones to value FLAG.
 FLAG defaults to the value of the modified flag of the current buffer."
-  (let ((modified (if (consp flag) (car flag) (buffer-modified-p))))
+  (unless jac-inhibit-set-clones-modified-p
+    (let ((modified (if (consp flag) (car flag) (buffer-modified-p)))
+	  (jac-inhibit-set-clones-modified-p t))
+      (cl-loop for buf in jac-clones do
+	       (with-current-buffer buf
+		 (unless (eq (buffer-modified-p) modified)
+		   (set-buffer-modified-p modified) ;; This re-invokes `jac-set-clones-modified-p'.
+		   ))))))
+
+(defun jac-revert-clones ()
+  "Revert clones with the contents of the master."
+  (let ((contents (save-restriction
+		    (widen)
+		    (buffer-substring-no-properties (point-min) (point-max)))))
     (cl-loop for buf in jac-clones do
-	     (with-current-buffer buf
-	       (unless (eq (buffer-modified-p) modified)
-		 (set-buffer-modified-p modified))))))
+	     (jac-with-current-wide-buffer buf
+	       (delete-region (point-min) (point-max))
+	       (insert contents)))
+    (jac-set-clones-modified-p)))
 
 (add-hook 'before-change-functions  #'jac-before-change)
 (add-hook 'after-change-functions  #'jac-after-change)
-
-(add-hook 'after-save-hook #'jac-set-buffer-modified-p)
+(add-hook 'after-save-hook #'jac-set-clones-modified-p)
+(add-hook 'after-revert-hook #'jac-revert-clones)
+(advice-add 'set-buffer-modified-p :after #'jac-set-clones-modified-p)
+;;< Does not work within c commands but works for undo.
 
 (provide 'jac)
 ;;; jac.el ends here
