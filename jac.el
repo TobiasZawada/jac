@@ -42,12 +42,22 @@
   "List of clones that need to be adapted to the original buffer.")
 (put 'jac-clones 'permanent-local t)
 
+(defmacro jac-with-current-wide-buffer (buffer &rest body)
+  "Execute the forms in BODY with BUFFER temporarily current.
+This expands to:
+\\(with-current-buffer BUFFER (save-restriction (widen) ...BODY...))."
+  (declare (debug (sexp body)) (indent 1))
+  `(with-current-buffer ,buffer
+     (save-restriction
+       (widen)
+       ,@body)))
+
 (defun jac-before-change (b e)
   "Kill region betweenn B and E in the clones."
   (let ((clones jac-clones))
     (cl-loop for buf in jac-clones do
 	     (if (buffer-live-p buf)
-		 (with-current-buffer buf
+		 (jac-with-current-wide-buffer buf
 		   (let ((inhibit-modification-hooks t))
 		     (delete-region b e)))
 	       (setq clones (cl-remove buf clones))))
@@ -61,7 +71,7 @@ Point's position is corrected with LEN."
 	(modified (buffer-modified-p)))
     (cl-loop for buf in jac-clones do
 	     (if (buffer-live-p buf)
-		 (with-current-buffer buf
+		 (jac-with-current-wide-buffer buf
 		   (let ((inhibit-modification-hooks t)
 			 (newPt (if (< (point) b) (point)
 				  (+ (point) (- b e) (- len)))))
