@@ -52,36 +52,41 @@ This expands to:
        (widen)
        ,@body)))
 
+(defmacro jac-do-clones (&rest body)
+  "Evaluate BODY in the clones of current buffer.
+The clone is widened before running BODY.
+Dead buffers are deleted from `jac-clones'."
+  (declare (debug body))
+  (let ((clones (make-symbol "clones"))
+	(buf (make-symbol "buf")))
+    `(let ((,clones jac-clones))
+       (cl-loop for ,buf in jac-clones do
+		(if (buffer-live-p ,buf)
+		    (jac-with-current-wide-buffer ,buf
+		      ,@body)
+		  (setq ,clones (cl-remove ,buf ,clones))))
+       (setq jac-clones ,clones))))
+
 (defun jac-before-change (b e)
   "Kill region betweenn B and E in the clones."
-  (let ((clones jac-clones))
-    (cl-loop for buf in jac-clones do
-	     (if (buffer-live-p buf)
-		 (jac-with-current-wide-buffer buf
-		   (let ((inhibit-modification-hooks t))
-		     (delete-region b (min e (point-max)))))
-	       (setq clones (cl-remove buf clones))))
-    (setq jac-clones clones)))
+  (jac-do-clones
+    (let ((inhibit-modification-hooks t))
+      (delete-region b (min e (point-max))))))
 
 (defun jac-after-change (b e len)
   "Copy the text between B and E to B in the clones.
 Point's position is corrected with LEN."
   (let ((str (buffer-substring-no-properties b e))
-	(clones jac-clones)
 	(modified (buffer-modified-p)))
-    (cl-loop for buf in jac-clones do
-	     (if (buffer-live-p buf)
-		 (jac-with-current-wide-buffer buf
-		   (let ((inhibit-modification-hooks t)
-			 (newPt (if (< (point) b) (point)
-				  (+ (point) (- b e) (- len)))))
-		     (goto-char b)
-		     (insert str)
-		     (goto-char newPt)
-		     (unless (eq (buffer-modified-p) modified)
-		       (set-buffer-modified-p modified))))
-	       (setq clones (cl-remove buf clones))))
-    (setq jac-clones clones)))
+    (jac-do-clones
+	(let ((inhibit-modification-hooks t)
+	      (newPt (if (< (point) b) (point)
+		       (+ (point) (- b e) (- len)))))
+	  (goto-char b)
+	  (insert str)
+	  (goto-char newPt)
+	  (unless (eq (buffer-modified-p) modified)
+	    (set-buffer-modified-p modified))))))
 
 ;;;###autoload
 (defun jac (&optional newname display-flag)
@@ -113,21 +118,19 @@ FLAG defaults to the value of the modified flag of the current buffer."
   (unless jac-inhibit-set-clones-modified-p
     (let ((modified (if (consp flag) (car flag) (buffer-modified-p)))
 	  (jac-inhibit-set-clones-modified-p t))
-      (cl-loop for buf in jac-clones do
-	       (with-current-buffer buf
-		 (unless (eq (buffer-modified-p) modified)
-		   (set-buffer-modified-p modified) ;; This re-invokes `jac-set-clones-modified-p'.
-		   ))))))
+      (jac-do-clones
+	  (unless (eq (buffer-modified-p) modified)
+	    (set-buffer-modified-p modified) ;; This re-invokes `jac-set-clones-modified-p'.
+	    )))))
 
 (defun jac-revert-clones ()
   "Revert clones with the contents of the master."
   (let ((contents (save-restriction
 		    (widen)
 		    (buffer-substring-no-properties (point-min) (point-max)))))
-    (cl-loop for buf in jac-clones do
-	     (jac-with-current-wide-buffer buf
-	       (delete-region (point-min) (point-max))
-	       (insert contents)))
+    (jac-do-clones
+	(delete-region (point-min) (point-max))
+      (insert contents))
     (jac-set-clones-modified-p)))
 
 (add-hook 'before-change-functions  #'jac-before-change)
