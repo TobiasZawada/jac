@@ -1,8 +1,8 @@
 ;;; jac.el --- Just another buffer cloning method.   -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019  DREWOR020
+;; Copyright (C) 2019  Tobias Zawada
 
-;; Author: DREWOR020 <toz@smtp.1und1.de>
+;; Author: Tobias Zawada <i@tn-home.de>
 ;; Keywords: convenience
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -48,9 +48,10 @@ This expands to:
 \\(with-current-buffer BUFFER (save-restriction (widen) ...BODY...))."
   (declare (debug (sexp body)) (indent 1))
   `(with-current-buffer ,buffer
-     (save-restriction
-       (widen)
-       ,@body)))
+     (save-excursion
+       (save-restriction
+	 (widen)
+	 ,@body))))
 
 (defmacro jac-do-clones (&rest body)
   "Evaluate BODY in the clones of current buffer.
@@ -58,10 +59,14 @@ The clone is widened before running BODY.
 Dead buffers are deleted from `jac-clones'."
   (declare (debug body))
   (let ((clones (make-symbol "clones"))
-	(buf (make-symbol "buf")))
-    `(let ((,clones jac-clones))
+	(buf (make-symbol "buf"))
+	(master-name (make-symbol "master")))
+    `(let ((,master-name (buffer-file-name))
+	   (,clones jac-clones))
        (cl-loop for ,buf in jac-clones do
-		(if (buffer-live-p ,buf)
+		(if (and (buffer-live-p ,buf)
+			 (string-equal (buffer-file-name ,buf)
+				       ,master-name))
 		    (jac-with-current-wide-buffer ,buf
 		      ,@body)
 		  (setq ,clones (cl-remove ,buf ,clones))))
@@ -107,7 +112,8 @@ DISPLAY-FLAG works like for `clone-buffer'."
 	(setq jac-clones (cons new jac-clones))
       (with-current-buffer new
 	(setq jac-clones (cons old jac-clones))
-	(setq buffer-file-name file))))))
+	(setq buffer-file-name file)))
+      new)))
 
 (defvar jac-inhibit-set-clones-modified-p nil
   "Master for current buffer modifying operation.")
@@ -139,6 +145,23 @@ FLAG defaults to the value of the modified flag of the current buffer."
 (add-hook 'after-revert-hook #'jac-revert-clones)
 (advice-add 'set-buffer-modified-p :after #'jac-set-clones-modified-p)
 ;;< Does not work within c commands but works for undo.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Test support
+
+(defun jac-equal-buffer-text-p (buffer1 &optional buffer2)
+  "Return non-nil if BUFFER1 and BUFFER2 have the same text.
+Text properties are ignored.
+BUFFER2 defaults to `current-buffer'."
+  (unless buffer2
+    (setq buffer2 (current-buffer)))
+  (string-equal
+   (jac-with-current-wide-buffer buffer1
+     (buffer-substring-no-properties (point-min) (point-max)))
+   (jac-with-current-wide-buffer buffer2
+     (buffer-substring-no-properties (point-min) (point-max)))))
+
+
 
 (provide 'jac)
 ;;; jac.el ends here
